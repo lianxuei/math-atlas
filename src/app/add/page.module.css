@@ -7,9 +7,113 @@
   flex-direction: column;
 }
 
+/* ========== 新增：知识点相关样式 ========== */
+.knowledgeBtn {
+  padding: 0.5rem 1rem;
+  border: 1px dashed #6c757d;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.knowledgeBtn:hover {
+  background-color: #e9ecef;
+  border-color: #495057;
+}
+
+.knowledgePanel {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.knowledgeTextarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.knowledgeParseBtn {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid #28a745;
+  border-radius: 6px;
+  background-color: #d4edda;
+  color: #155724;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.knowledgeParseBtn:hover {
+  background-color: #c3e6cb;
+}
+
+.knowledgePreview {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.knowledgeItem {
+  padding: 2px 0;
+  font-size: 0.85rem;
+  color: #495057;
+}
+
+.knowledgeNum {
+  font-weight: 600;
+  color: #212529;
+  margin-right: 4px;
+}
+
+.knowledgeTag {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid #a5d6a7;
+  margin-left: 4px;
+}
+
+/* ================================= */
 .title {
   font-size: 1rem;
   margin-bottom: 0.4rem;
+}
+
+.remoteImageHint {
+  background: #fff3cd;
+  color: #856404;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  border: 1px solid #ffc107;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.remoteTag {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  border: 1px solid #90caf9;
 }
 
 /* 元数据栏 */
@@ -285,7 +389,7 @@
   font-size: 0.8rem;
 }
 
-.cardDetail > *:not(summary) {
+.cardDetail>*:not(summary) {
   margin-top: 0.3rem;
 }
 
