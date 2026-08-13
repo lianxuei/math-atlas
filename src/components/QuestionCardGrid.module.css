@@ -1,0 +1,253 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  gap: 0.6rem;
+}
+
+.card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.cardSelected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.cardExpanded {
+  border-color: var(--accent);
+}
+
+/* 头部 */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+}
+
+.checkLabel input {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.numBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.typeBadge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0.5;
+  padding: 2px 4px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.iconBtn:hover {
+  opacity: 1;
+}
+
+/* 题干预览区 */
+.questionArea {
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.8;
+  color: var(--text);
+  min-height: 60px;
+}
+
+.questionCollapsed {
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.questionCollapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
+}
+
+.cardSelected .questionCollapsed::after {
+  background: linear-gradient(transparent, var(--accent-light));
+}
+
+.questionArea :global(p) {
+  margin: 0.25rem 0;
+}
+
+.questionArea :global(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.loading {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.noContent {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* 展开区域 */
+.expandSection {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.detailSection h4 {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.foldTitle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.foldTitle:hover {
+  color: var(--accent);
+}
+
+.detailNote {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.detailNote h4 {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.82rem;
+}
+
+.detailNoteMine {
+  background: var(--warning-bg);
+  border-left: 3px solid var(--warning);
+}
+
+.detailNoteAI {
+  background: var(--note-bg);
+  border-left: 3px solid var(--note-border);
+}
+
+/* 知识点标签 */
+.knowledgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.knowledgeTag {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 答案徽章 */
+.answerRow {
+  flex-shrink: 0;
+}
+
+.answerBadge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+:root[data-theme='dark'] .answerBadge {
+  background: #1b3a1c;
+  color: #81c784;
+}
+
+/* 来源 */
+.sourceRow {
+  font-size: 0.78rem;
+  color: var(--accent);
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  grid-column: 1 / -1;
+}

@@ -1,10 +1,34 @@
+/* 修改容器：让卡片变成 flex 并允许换行 */
 .container {
+  display: flex;
+  flex-wrap: wrap; /* 允许换行 */
+  gap: 1rem;
+  max-width: 100%; /* 去掉 960px 的限制，占满屏幕 */
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+/* 新增：每个卡片占 50% 宽度，减去 gap */
+.card {
+  flex: 0 0 calc(50% - 0.5rem); /* 两列展示 */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 1.25rem;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+  /* 高度自适应，避免强行等高 */
+}
+
+/* 如果你想让卡片高度固定，防止一高一低，可以注释掉上面，改下这句： */
+/* .card { width: calc(50% - 0.5rem); } */
+/* .container {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   max-width: 960px;
   margin: 0 auto;
-}
+} */
 
 .card {
   border: 1px solid var(--border);

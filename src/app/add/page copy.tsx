@@ -5,117 +5,51 @@ import MathText from '@/components/MathText';
 import styles from './page.module.css';
 import { clientEnv } from '@/lib/env';
 
+// ========== 新增：知识点表格解析 ==========
 /**
- * 智能解析知识点表格文本（兼容菁优网 & 学科网）
+ * 解析知识点表格文本
+ * 输入示例：
+ * 无理数	1	1	3	4.35%	2.5%
+ * 二次根式的混合运算	3	2,16,22	25	13.04%	20.83%
  * 
- * 菁优网格式:
- * 知识点	题量	题号	分值	...
- * 无理数	1	1	3	...
- * 
- * 学科网格式:
- * 题号	难度系数	详细知识点	备注
- * 1	0.85	求一个数的立方根 无理数	...
+ * 返回: { "1": ["无理数"], "2": ["二次根式的混合运算"], "16": ["二次根式的混合运算"], ... }
  */
 function parseKnowledgeTable(text: string): Record<string, string[]> {
   const result: Record<string, string[]> = {};
 
   if (!text.trim()) return result;
 
-  // 分割成行
-  const lines = text.trim().split('\n').filter(line => line.trim() && !line.startsWith('---') && !line.startsWith('==='));
+  const lines = text.trim().split('\n');
 
-  if (lines.length < 2) return result;
+  for (const line of lines) {
+    // 跳过空行和分隔符
+    if (!line.trim() || line.startsWith('---') || line.startsWith('===')) continue;
 
-  // 1. 智能识别表头所在行，判断列位置
-  // 我们尝试寻找包含 "题号" 或 "知识点" 关键字的行作为表头
-  let headerLineIndex = 0;
-  let detectedHeaders: string[] = [];
+    // 按制表符或多个空格拆分
+    const cols = line.split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
 
-  for (let i = 0; i < Math.min(3, lines.length); i++) {
-    const parts = lines[i].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
-    // 如果这一行包含了 "题号" 或者 "知识点" 这种关键词，它一定是表头
-    if (parts.some(p => p.includes('题号') || p.includes('知识点'))) {
-      headerLineIndex = i;
-      detectedHeaders = parts;
-      break;
+    if (cols.length < 3) continue;
+
+    // 跳过表头行
+    if (cols[0] === '知识点' || cols[0] === '考点' || cols[0].includes('知识')) {
+      console.log('跳过表头:', cols[0]);
+      continue;
     }
-  }
 
-  // 如果没找到表头，默认按第一行处理
-  if (detectedHeaders.length === 0) {
-    detectedHeaders = lines[0].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
-    headerLineIndex = 0;
-  }
+    const knowledgeName = cols[0];           // 知识点名称
+    const numberStr = cols[2];               // 题号列，如 "1" 或 "2,16,22"
 
-  // 2. 确定 "题号" 列 和 "知识点" 列的索引
-  let numColIndex = -1;
-  let knowColIndex = -1;
+    console.log('解析行:', { knowledgeName, numberStr });
 
-  // 处理题号列
-  const numHeaderIndex = detectedHeaders.findIndex(h => h.includes('题号'));
-  if (numHeaderIndex !== -1) {
-    numColIndex = numHeaderIndex;
-  } else {
-    // 如果没有"题号"，默认第一列就是题号 (适应学科网格式)
-    numColIndex = 0;
-  }
+    // 解析题号（支持逗号分隔）
+    const numbers = numberStr.split(/[,，]/).map(n => n.trim()).filter(Boolean);
 
-  // 处理知识点列（兼容不同叫法）
-  const knowHeaderIndex = detectedHeaders.findIndex(h => h.includes('知识点') || h.includes('考点'));
-  if (knowHeaderIndex !== -1) {
-    knowColIndex = knowHeaderIndex;
-  } else {
-    // 对于学科网，如果没找到"知识点"，通常第三列是"详细知识点"
-    const detailKnowIndex = detectedHeaders.findIndex(h => h.includes('详细知识点'));
-    if (detailKnowIndex !== -1) {
-      knowColIndex = detailKnowIndex;
-    } else {
-      // 如果连详细知识点都没有，默认最后一列是知识点（备用方案）
-      knowColIndex = detectedHeaders.length - 1;
-    }
-  }
-
-  // 如果列没识别出来（防止全错），直接返回空
-  if (numColIndex === -1 || knowColIndex === -1) {
-    console.warn('知识点解析失败：无法识别题号列或知识点列');
-    return result;
-  }
-
-  console.log(`智能识别表头: [${detectedHeaders.join(', ')}]`);
-  console.log(`  -> 题号列在第 ${numColIndex + 1} 列`);
-  console.log(`  -> 知识点列在第 ${knowColIndex + 1} 列`);
-
-  // 3. 逐行解析数据
-  for (let i = headerLineIndex + 1; i < lines.length; i++) {
-    const cols = lines[i].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
-    
-    // 安全保护：如果该行列数小于识别出的最大索引，跳过这一行（可能是空的或表分隔符）
-    if (cols.length <= Math.max(numColIndex, knowColIndex)) continue;
-
-    // 修复学科网 "一、单选题" 这种干扰行
-    if (cols[0].includes('一、') || cols[0].includes('二、') || cols[0].includes('三、')) continue;
-
-    // 提取题号并清理
-    let numberStr = cols[numColIndex];
-    // 防止像 "T1" 或 "1." 这种后缀导致匹配失败
-    let cleanNum = numberStr.replace(/^T/i, '').replace(/\.$/, '').trim();
-
-    // 提取知识点并进行拆分 (兼容空格和换行分隔)
-    let knowledgeText = cols[knowColIndex];
-    // 学科网格式里，同一个题号可能有多个知识点（如："求一个数的立方根  无理数"），用空格或换行分隔
-    let knowledges = knowledgeText.split(/[\s\n]+/).filter(k => k.trim() !== '');
-
-    // 如果知识点包含非汉字字符（如：%, 系数等），可能是菁优网的，直接按整体保留即可
-    // 但为了最大化兼容，直接存分割后的数组
-
-    if (cleanNum && knowledges.length > 0) {
-      if (!result[cleanNum]) {
-        result[cleanNum] = [];
+    for (const num of numbers) {
+      if (!result[num]) {
+        result[num] = [];
       }
-      for (const k of knowledges) {
-        if (!result[cleanNum].includes(k)) {
-          result[cleanNum].push(k);
-        }
+      if (!result[num].includes(knowledgeName)) {
+        result[num].push(knowledgeName);
       }
     }
   }
@@ -663,7 +597,7 @@ export default function AddPage() {
       {showKnowledgeInput && (
         <div className={styles.knowledgePanel}>
           <div className={styles.panelHeader}>
-            知识点表格
+            知识点表格（题号列在第三列）
             <button
               className={styles.knowledgeParseBtn}
               onClick={handleParseKnowledge}
@@ -677,14 +611,10 @@ export default function AddPage() {
 知识点	题量	题号	分值	题量占比	分值占比
 无理数	1	1	3	4.35%	2.5%
 二次根式的混合运算	3	2,16,22	25	13.04%	20.83%
---该格式直接复制于箐优网的分析-知识点分析--
+勾股数	1	3	3	4.35%	2.5%
+勾股定理	3	4,9,23	16	13.04%	13.33%
 
-题号	难度系数	详细知识点	备注
-一、单选题
-1	0.85	求一个数的立方根  无理数	
-2	0.65	构成三角形的条件	
---该格式直接复制于学科网的细目表分析--
-
+该格式直接复制于箐优网的分析-知识点分析
 解析后会自动匹配题号，入库时填充 knowledge 字段`}
             value={knowledgeInput}
             onChange={e => setKnowledgeInput(e.target.value)}
