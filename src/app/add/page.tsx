@@ -27,13 +27,11 @@ function parseKnowledgeTable(text: string): Record<string, string[]> {
   if (lines.length < 2) return result;
 
   // 1. 智能识别表头所在行，判断列位置
-  // 我们尝试寻找包含 "题号" 或 "知识点" 关键字的行作为表头
   let headerLineIndex = 0;
   let detectedHeaders: string[] = [];
 
   for (let i = 0; i < Math.min(3, lines.length); i++) {
     const parts = lines[i].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
-    // 如果这一行包含了 "题号" 或者 "知识点" 这种关键词，它一定是表头
     if (parts.some(p => p.includes('题号') || p.includes('知识点'))) {
       headerLineIndex = i;
       detectedHeaders = parts;
@@ -41,7 +39,6 @@ function parseKnowledgeTable(text: string): Record<string, string[]> {
     }
   }
 
-  // 如果没找到表头，默认按第一行处理
   if (detectedHeaders.length === 0) {
     detectedHeaders = lines[0].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
     headerLineIndex = 0;
@@ -51,31 +48,25 @@ function parseKnowledgeTable(text: string): Record<string, string[]> {
   let numColIndex = -1;
   let knowColIndex = -1;
 
-  // 处理题号列
   const numHeaderIndex = detectedHeaders.findIndex(h => h.includes('题号'));
   if (numHeaderIndex !== -1) {
     numColIndex = numHeaderIndex;
   } else {
-    // 如果没有"题号"，默认第一列就是题号 (适应学科网格式)
     numColIndex = 0;
   }
 
-  // 处理知识点列（兼容不同叫法）
   const knowHeaderIndex = detectedHeaders.findIndex(h => h.includes('知识点') || h.includes('考点'));
   if (knowHeaderIndex !== -1) {
     knowColIndex = knowHeaderIndex;
   } else {
-    // 对于学科网，如果没找到"知识点"，通常第三列是"详细知识点"
     const detailKnowIndex = detectedHeaders.findIndex(h => h.includes('详细知识点'));
     if (detailKnowIndex !== -1) {
       knowColIndex = detailKnowIndex;
     } else {
-      // 如果连详细知识点都没有，默认最后一列是知识点（备用方案）
       knowColIndex = detectedHeaders.length - 1;
     }
   }
 
-  // 如果列没识别出来（防止全错），直接返回空
   if (numColIndex === -1 || knowColIndex === -1) {
     console.warn('知识点解析失败：无法识别题号列或知识点列');
     return result;
@@ -87,27 +78,69 @@ function parseKnowledgeTable(text: string): Record<string, string[]> {
 
   // 3. 逐行解析数据
   for (let i = headerLineIndex + 1; i < lines.length; i++) {
-    const cols = lines[i].split(/\t+| {2,}/).map(s => s.trim()).filter(Boolean);
-    
-    // 安全保护：如果该行列数小于识别出的最大索引，跳过这一行（可能是空的或表分隔符）
-    if (cols.length <= Math.max(numColIndex, knowColIndex)) continue;
+    // 先按制表符分割
+    let cols = lines[i].split('\t').map(s => s.trim()).filter(Boolean);
+
+    // 如果按制表符分割后列数太少，尝试按多个空格分割
+    if (cols.length < 3) {
+      cols = lines[i].split(/ {2,}/).map(s => s.trim()).filter(Boolean);
+    }
+
+    // 如果还是太少，按普通空白分割（但这样会破坏知识点内的空格）
+    if (cols.length < 3) {
+      cols = lines[i].split(/\s+/).map(s => s.trim()).filter(Boolean);
+    }
+
+    // 跳过空行或列数太少的行
+    if (cols.length === 0) continue;
 
     // 修复学科网 "一、单选题" 这种干扰行
     if (cols[0].includes('一、') || cols[0].includes('二、') || cols[0].includes('三、')) continue;
 
-    // 提取题号并清理
-    let numberStr = cols[numColIndex];
-    // 防止像 "T1" 或 "1." 这种后缀导致匹配失败
-    let cleanNum = numberStr.replace(/^T/i, '').replace(/\.$/, '').trim();
+    // 提取题号 - 尝试从第0列或第1列提取
+    let cleanNum = '';
+    let numberStr = cols[0];
+    // 如果第0列不是数字且有第1列，尝试第1列
+    if (!/^\d+$/.test(numberStr) && cols.length > 1) {
+      numberStr = cols[1];
+    }
+    cleanNum = numberStr.replace(/^T/i, '').replace(/\.$/, '').trim();
 
-    // 提取知识点并进行拆分 (兼容空格和换行分隔)
-    let knowledgeText = cols[knowColIndex];
-    // 学科网格式里，同一个题号可能有多个知识点（如："求一个数的立方根  无理数"），用空格或换行分隔
-    let knowledges = knowledgeText.split(/[\s\n]+/).filter(k => k.trim() !== '');
+    // 如果 cleanNum 不是纯数字，跳过
+    if (!/^\d+$/.test(cleanNum)) continue;
 
-    // 如果知识点包含非汉字字符（如：%, 系数等），可能是菁优网的，直接按整体保留即可
-    // 但为了最大化兼容，直接存分割后的数组
+    // ========== 核心修复：合并知识点列 ==========
+    // 从知识点列开始，把所有后续列合并起来（因为多个空格会把知识点拆分成多个cols元素）
+    let knowledgeText = '';
+    for (let j = knowColIndex; j < cols.length; j++) {
+      // 如果当前列看起来像题号（纯数字）且不是第一列，说明是下一题的数据，停止
+      if (/^\d+$/.test(cols[j]) && j > 0) {
+        break;
+      }
+      // 跳过明显不是知识点的列（如 "计算题"、"应用题" 等，但保留它们作为知识点的一部分）
+      knowledgeText += (knowledgeText ? ' ' : '') + cols[j];
+    }
 
+    // 如果知识点文本为空，尝试从所有列中查找包含中文的列
+    if (!knowledgeText.trim()) {
+      for (let j = 0; j < cols.length; j++) {
+        if (j !== numColIndex && /[\u4e00-\u9fa5]/.test(cols[j])) {
+          knowledgeText += (knowledgeText ? ' ' : '') + cols[j];
+        }
+      }
+    }
+
+    // 将各种空白字符统一替换为普通空格，然后分割
+    knowledgeText = knowledgeText.replace(/[\s\n]+/g, ' ').replace(/[　\u00A0]/g, ' ');
+    let knowledges = knowledgeText.split(' ').filter(k => k.trim() !== '');
+
+    // 如果知识点列表为空，或者所有知识点都太短（可能是数字或符号），跳过
+    if (knowledges.length === 0) continue;
+
+    // 过滤掉纯数字或纯符号的知识点
+    knowledges = knowledges.filter(k => !/^[\d.]+$/.test(k) && k.length > 1);
+
+    // 去重并存入结果
     if (cleanNum && knowledges.length > 0) {
       if (!result[cleanNum]) {
         result[cleanNum] = [];
@@ -245,7 +278,7 @@ export default function AddPage() {
   const [examType, setExamType] = useState('');
   const [defaultType, setDefaultType] = useState('');
   const router = useRouter();
-
+  const [defaultYear, setDefaultYear] = useState('202');
   const [defaultGrade, setDefaultGrade] = useState(clientEnv.defaultGrade);
   const [defaultSemester, setDefaultSemester] = useState('');
   const [saving, setSaving] = useState(false);
@@ -355,7 +388,7 @@ export default function AddPage() {
         return null;
       }
       const data = await res.json();
-      return `images/${data.filename}`;
+      return data.path;
     } catch (error) {
       console.error(`下载远程图片出错: ${remoteUrl}`, error);
       return null;
@@ -446,11 +479,26 @@ export default function AddPage() {
       for (const [remoteUrl, localPath] of allRemoteImages) {
         if (!localPath) continue;
         const escapedUrl = remoteUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const fileName = remoteUrl.split('/').pop() || '';
+
+        // 1. 替换 images/https://... 格式
+        processedBody = processedBody.replace(
+          new RegExp(`!\\[([^\\]]*)\\]\\(images/${escapedUrl}\\)`, 'g'),
+          `![$1](${localPath})`
+        );
+        // 2. 替换纯 https://... 格式
         processedBody = processedBody.replace(
           new RegExp(`!\\[([^\\]]*)\\]\\(${escapedUrl}\\)`, 'g'),
           `![$1](${localPath})`
         );
-        processedBody = processedBody.replace(new RegExp(escapedUrl, 'g'), localPath);
+        // 3. 替换只有文件名没有路径的格式
+        if (fileName) {
+          const escapedFileName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          processedBody = processedBody.replace(
+            new RegExp(`!\\[([^\\]]*)\\]\\(${escapedFileName}\\)`, 'g'),
+            `![$1](${localPath})`
+          );
+        }
       }
 
       for (const key of Object.keys(q.sections)) {
@@ -458,28 +506,37 @@ export default function AddPage() {
         for (const [remoteUrl, localPath] of allRemoteImages) {
           if (!localPath) continue;
           const escapedUrl = remoteUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const fileName = remoteUrl.split('/').pop() || '';
+
+          sectionContent = sectionContent.replace(
+            new RegExp(`!\\[([^\\]]*)\\]\\(images/${escapedUrl}\\)`, 'g'),
+            `![$1](${localPath})`
+          );
           sectionContent = sectionContent.replace(
             new RegExp(`!\\[([^\\]]*)\\]\\(${escapedUrl}\\)`, 'g'),
             `![$1](${localPath})`
           );
+          if (fileName) {
+            const escapedFileName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            sectionContent = sectionContent.replace(
+              new RegExp(`!\\[([^\\]]*)\\]\\(${escapedFileName}\\)`, 'g'),
+              `![$1](${localPath})`
+            );
+          }
           sectionContent = sectionContent.replace(new RegExp(escapedUrl, 'g'), localPath);
         }
         q.sections[key] = sectionContent;
       }
 
-      // ========== 核心修改：从知识点表格中获取知识点 ==========
+      // ========== 从知识点表格中获取知识点 ==========
       let finalKnowledge: string[] = Array.isArray(y.knowledge) ? y.knowledge : [];
 
-      // 获取当前题目的题号（去掉可能的 T 前缀，用于匹配表格）
-      const rawNumber = y.number || '';  // 如 "T1"
-      const questionNumber = rawNumber.replace(/^T/i, '');  // 变成 "1"
+      const rawNumber = y.number || '';
+      const questionNumber = rawNumber.replace(/^T/i, '');
 
-      // 如果 YAML 中没写知识点，且知识点表格中有对应题号，则自动填充
       if (finalKnowledge.length === 0 && questionNumber && knowledgeMap[questionNumber]) {
         finalKnowledge = knowledgeMap[questionNumber];
-      }
-      // 如果 YAML 中写了知识点，但表格中也有，就合并（去重）
-      else if (questionNumber && knowledgeMap[questionNumber]) {
+      } else if (questionNumber && knowledgeMap[questionNumber]) {
         for (const k of knowledgeMap[questionNumber]) {
           if (!finalKnowledge.includes(k)) {
             finalKnowledge.push(k);
@@ -488,17 +545,17 @@ export default function AddPage() {
       }
 
       console.log(`题目 ${rawNumber}: 最终知识点 =`, finalKnowledge);
-      // ==========================================
 
       list.push({
         source: y.source || source.trim(),
-        number: rawNumber,  // 保留原始题号（如 "T1"）
+        year: y.year || defaultYear,
+        number: rawNumber,
         type: finalType,
         grade: y.grade || defaultGrade,
         semester: y.semester || defaultSemester,
         exam_type: y.exam_type || examType,
         difficulty: y.difficulty != null && y.difficulty !== '' ? Number(y.difficulty) : null,
-        knowledge: finalKnowledge,  // 使用合并后的知识点
+        knowledge: finalKnowledge,
         tags: Array.isArray(y.tags) ? y.tags : [],
         content: processedBody,
         originalRemoteImages: q.remoteImages,
@@ -587,6 +644,16 @@ export default function AddPage() {
         <label className={styles.metaLabel}>
           来源
           <input className={styles.metaInput} placeholder="留空则取 YAML 中的来源" value={source} onChange={e => setSource(e.target.value)} />
+        </label>
+        {/* 新增：年份输入框 */}
+        {/* 新增：年份输入框 */}
+        <label className={styles.metaLabel}>
+          年份
+          <input
+            className={styles.metaInput}
+            value={defaultYear}
+            onChange={e => setDefaultYear(e.target.value)}
+          />
         </label>
         <label className={styles.metaLabel}>
           年级
@@ -786,6 +853,7 @@ export default function AddPage() {
                       const y = q.yaml;
                       const vals: string[] = [];
                       vals.push(y.grade || defaultGrade);
+                      if (y.year || defaultYear) vals.push(y.year || defaultYear);
                       const sem = y.semester || defaultSemester;
                       if (sem) vals.push(sem);
                       const et = y.exam_type || examType;

@@ -10,6 +10,7 @@ import { serverEnv } from '@/lib/env';
 interface QuestionInput {
   content: string;
   source: string;
+  year: string;
   number: string;
   type: string;
   grade?: string;
